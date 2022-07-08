@@ -1,0 +1,117 @@
+#!/bin/bash
+
+function help() {
+    cat <<EOF
+
+Usage: 
+ $(basename $0) [-e|-g|-h] [VirtualGL options] [--] <3D application> [3D application args]
+
+Option:
+ -e, --egl             Use the EGL back end for 3D rendering (default)
+ -g, --glx             Use the GLX back end for 3D rendering
+ -h, --help            This usage guide
+ -?, --help_vgl        Show VirtualGL options
+EOF
+}
+
+[ $# -eq 0 ] && help && exit
+
+# make sure vglrun is available
+_vglrun="/bin/vglrun"
+if [ ! -x ${_vglrun} ]; then
+    echo "vglrun is not found or cannot be excuted. Please email hpc@yale.edu for help."
+    exit 1
+fi
+
+ 
+use_egl=0
+use_glx=0
+# process the first option 
+case $1 in
+    -h|--help)
+        help
+        exit
+        ;;
+    -\?|--help_vgl)
+        ${_vglrun} --help
+        exit
+        ;;
+    -e|--egl)
+        use_egl=1
+        shift
+        ;;
+    -g|--glx)
+        use_glx=1
+        shift
+        ;;
+esac
+
+MYPYCMD=$(cat <<EOF
+import subprocess
+cmd1 = ['nvidia-smi', '--query-gpu=gpu_bus_id', '--format=csv,noheader']
+proc1 = subprocess.Popen(cmd1, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+string1 = proc1.stdout.readline().lower().decode()
+if 'no devices were found' in string1:
+    print('export VGL_DISPLAY=NotFound')
+else:
+    gpu_bus_id = string1.strip('\n')[4:]
+    cmd2 = '''ls -d /sys/bus/pci/devices/%s/drm/card*'''%(gpu_bus_id)
+    proc2 = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    dri_device = proc2.stdout.readline().decode().strip('\n').split('/')[-1]
+    print('export VGL_DISPLAY=/dev/dri/'+dri_device)
+EOF
+)
+
+# sanity check: make sure nvidia-smi is in path
+which nvidia-smi > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "nvidia-smi is not found in your path. Make sure you have specified a partition with GPU nodes."
+    exit 2
+fi
+
+$(python -c "$MYPYCMD")
+
+if [ $VGL_DISPLAY == 'NotFound' ]; then
+    echo "Error: No GPU devices are found. Make sure you have specified GPU with --gres=gpu:num."
+    exit 3
+fi
+
+if (( $use_glx == 1)); then
+    # we use a lockfile to enure only one user can use GLX on the node
+    if [ -e /tmp/ycrc_virtualgl.lock ]; then
+        echo
+        echo "    VirtualGL with the GLX back end is currently used by another application."
+        echo "    Please resubmit your job with"
+        echo 
+        echo "          --exclude=$(hostname -s)"
+        exit 5
+    fi
+    touch /tmp/ycrc_virtualgl.lock
+
+    # Automatically determine an unused $DISPLAY
+    d=1
+    while true ; do
+        [ -e "/tmp/.X$d-lock" -o -S "/tmp/.X11-unix/X$d" ] ||
+            grep -q "/tmp/.X11-unix/X$d" "/proc/net/unix" ||
+            break
+        d=$(($d + 1))
+    done
+    defaultdisplay=":$d"
+    unset d
+
+    echo "Running VirtualGL via the GLX back end"
+    echo "DISPLAY is $defaultdisplay"
+    /usr/bin/X $defaultdisplay -noreset >& /dev/null &
+    pid=$!
+
+    eval ${_vglrun} -d $defaultdisplay "$@"
+
+    # cleanup
+    rm /tmp/ycrc_virtualgl.lock
+    kill ${pid}
+else
+    echo "Running VirtualGL via the EGL back end"
+    echo "The device in use is $VGL_DISPLAY"
+    eval ${_vglrun} "$@"
+fi
+
