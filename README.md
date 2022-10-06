@@ -4,6 +4,7 @@ A wrapper script for vglrun used at YCRC
 # Requirement
 
 1. NVIDIA GPU
+1. TurboVNC server
 1. VirutalGL: version 3.0 and above are required. 
 
 # Motivation
