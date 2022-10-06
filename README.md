@@ -5,7 +5,7 @@ A wrapper script for vglrun used at YCRC
 
 1. NVIDIA GPU
 1. TurboVNC server
-1. VirutalGL: version 3.0 and above are required. 
+1. VirutalGL: version 3.0 and above 
 
 # Motivation
 
@@ -30,7 +30,7 @@ See our VirtualGL [user guide](https://docs.ycrc.yale.edu/clusters-at-yale/guide
 1. Install the NVIDIA driver
 1. Configure the NVIDIA GPU for display
 ```{bash}
-nvidia-xconfig
+nvidia-xconfig -a
 ```
 3. Configure VirtualGL server
 ```{bash}
