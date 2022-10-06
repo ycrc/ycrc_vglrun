@@ -14,7 +14,7 @@ Option:
 EOF
 }
 
-[ ! $# -eq 1 ] && help && exit
+[ $# -eq 0 ] && help && exit
 
 # make sure vglrun is available
 _vglrun="/bin/vglrun"
@@ -26,6 +26,7 @@ fi
  
 use_egl=1
 use_glx=0
+# process the first parametre only
 case $1 in
     -h|--help)
         help
