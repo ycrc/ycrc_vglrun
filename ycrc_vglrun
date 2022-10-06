@@ -14,7 +14,7 @@ Option:
 EOF
 }
 
-[ $# -eq 0 ] && help && exit
+[ ! $# -eq 1 ] && help && exit
 
 # make sure vglrun is available
 _vglrun="/bin/vglrun"
@@ -24,9 +24,8 @@ if [ ! -x ${_vglrun} ]; then
 fi
 
  
-use_egl=0
+use_egl=1
 use_glx=0
-# process the first option 
 case $1 in
     -h|--help)
         help
@@ -84,7 +83,7 @@ if (( $use_glx == 1)); then
         echo "    Please resubmit your job with"
         echo 
         echo "          --exclude=$(hostname -s)"
-        exit 5
+        exit 4
     fi
     touch /tmp/ycrc_virtualgl.lock
 
@@ -103,12 +102,13 @@ if (( $use_glx == 1)); then
     echo "DISPLAY is $defaultdisplay"
     /usr/bin/X $defaultdisplay -noreset >& /dev/null &
     pid=$!
+    sleep 2
 
     eval ${_vglrun} -d $defaultdisplay "$@"
 
     # cleanup
-    rm /tmp/ycrc_virtualgl.lock
     kill ${pid}
+    rm /tmp/ycrc_virtualgl.lock
 else
     echo "Running VirtualGL via the EGL back end"
     echo "The device in use is $VGL_DISPLAY"
